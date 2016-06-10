@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# bin/release <build-dir>
+
+export INSTALL4J_JAVA_HOME=/home/vcap/app/vendor/jre
+###web: cd ./Boomi_AtomSphere/Atom/Atom_$BOOMI_ATOM/bin; sh ./atom start; wait
+
+cat << EOF
+addons: []
+config_vars: []
+default_process_types:
+  web: ./run_atom.sh
+EOF

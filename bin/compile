@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+
+set -e            # fail fast
+set -o pipefail   # don't ignore exit codes when piping output
+# set -x          # enable debugging
+
+# build_dir is /tmp/staged/app
+build_dir=$1
+
+# cache_dir is /tmp/cache
+cache_dir=$2
+
+module_name="atom_install64_original.sh"
+
+# build pack directory, parent of bp bin directory
+bp_dir=$(cd $(dirname $0); cd ..; pwd)
+
+# vendor_dir is /tmp/staged/app/vendor
+vendor_dir=$build_dir/vendor
+
+JRE_ARCHIVE=jre-1.6.38-linux-amd64.bin
+JRE_ARCHIVE_FILE=$bp_dir/files/$JRE_ARCHIVE
+
+cp $bp_dir/files/run_atom.sh $build_dir
+
+# CF Common
+BUILDPACK_PATH=$bp_dir
+export BUILDPACK_PATH
+source $bp_dir/compile-extensions/lib/common
+# END CF Common
+
+source $bp_dir/bin/common.sh
+
+mkdir -p $vendor_dir
+
+status "Installing java."
+cp $JRE_ARCHIVE_FILE $vendor_dir
+cd $vendor_dir
+./$JRE_ARCHIVE
+rm $JRE_ARCHIVE
+
+status "build_dir = $build_dir"
+status "cache_dir = $cache_dir"
+status "bp_dir = $bp_dir"
+status "vendor_dir = $vendor_dir"
+
+JRE_DIR=$vendor_dir/$(ls -l | tr " " "\n" | grep jre)
+
+# JRE_DIR is /tmp/staged/app/vendor/jre1.6.0_38
+status "JRE_DIR=$JRE_DIR"
+
+status `pwd`
+
+# now jre is in the /tmp/staged/app/vendor/jre directory
+mv $JRE_DIR jre
+
+JRE_DIR=$vendor_dir/jre
+
+JAVA_CMD=$JRE_DIR/bin/java
+
+status `$JAVA_CMD -version`
+
+# Update the PATH
+status "Building runtime environment"
+mkdir -p $build_dir/.profile.d
+echo "export PATH=\"\$HOME/vendor/jre/bin:\$HOME/bin:\$PATH\";" > $build_dir/.profile.d/jre.sh
+
+export PATH=$PATH:$JRE_DIR/bin
+
+status "begin boomi install..."
+cd $build_dir
+
+SFX_ARCHIVE=sfx_archive.tar
+SFX_ARCHIVE_FILE=$bp_dir/files/$SFX_ARCHIVE
+
+# sfx_dir is /tmp/staged/app
+sfx_dir=$build_dir
+
+status "sfx_dir = $sfx_dir"
+
+status "Installing sfx."
+cp $SFX_ARCHIVE_FILE ./
+tar xf $SFX_ARCHIVE
+rm $SFX_ARCHIVE
+
+INSTALL4J_NO_DB=
+
+status "test_jvm"
+status "JRE_DIR = $JRE_DIR"
+
+test_jvm $JRE_DIR
+
+prg_dir=$build_dir
+old_pwd=$build_dir
+bin_dir=$JRE_DIR/bin
+progname="compile"
+
+status "BOOMI_USER = $BOOMI_USER"
+
+compiz_workaround
+i4j_classpath="$sfx_dir/i4jruntime.jar:$sfx_dir/user.jar"
+local_classpath="$i4j_classpath"
+
+status "local_classpath = $local_classpath"
+
+
+vmoptions_val=""
+vmov_1=""
+vmov_2=""
+vmov_3=""
+vmov_4=""
+vmov_5=""
+
+
+read_vmoptions "$build_dir/$progname.vmoptions"
+
+INSTALL4J_ADD_VM_PARAMS="$vmoptions_val"
+
+status "INSTALL4J_ADD_VM_PARAMS = $INSTALL4J_ADD_VM_PARAMS"
+
+set +e
+if [ "W$vmov_1" = "W" ]; then
+  vmov_1="-Di4j.vmov=true"
+fi
+if [ "W$vmov_2" = "W" ]; then
+  vmov_2="-Di4j.vmov=true"
+fi
+if [ "W$vmov_3" = "W" ]; then
+  vmov_3="-Di4j.vmov=true"
+fi
+if [ "W$vmov_4" = "W" ]; then
+  vmov_4="-Di4j.vmov=true"
+fi
+if [ "W$vmov_5" = "W" ]; then
+  vmov_5="-Di4j.vmov=true"
+fi
+
+status "Starting Installer ..."
+set -e
+
+status "`pwd`"
+status "`ls -lat`"
+status "`ping -c 2 www.google.com`"
+
+status "bp_dir = $bp_dir"
+
+"$JAVA_CMD" -Dinstall4j.jvmDir="$JRE_DIR" -Dexe4j.moduleName="$bp_dir/files/$module_name" -Dexe4j.totalDataLength=1720347 -Dinstall4j.cwd="$old_pwd" -Djava.ext.dirs="$JRE_DIR/lib/ext" "-Dsun.java2d.noddraw=true" "$vmov_1" "$vmov_2" "$vmov_3" "$vmov_4" "$vmov_5" $INSTALL4J_ADD_VM_PARAMS -classpath "$local_classpath" com.install4j.runtime.Launcher launch com.install4j.runtime.installer.Installer false false "" "" false true false "" true true 0 0 "" 20 20 "Arial" "0,0,0" 8 500 "version 1.0" 20 40 "Arial" "0,0,0" 8 500 -1  "$@" <<EOF
+
+$BOOMI_USER
+$BOOMI_PW
+$BOOMI_ATOM
+
+$build_dir/Boomi_AtomSphere/Atom/Atom_$BOOMI_ATOM
+n
+
+EOF
